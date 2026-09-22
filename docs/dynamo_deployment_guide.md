@@ -45,8 +45,8 @@ Let's take a look at the pareto frontier,
     │          ffff       •                                                    │
     │              f       •••••••                                             │
 1125┤               ff            •                                            │
-    │                ff            ••••                                        │
-    │                  ffff            ••••x                                   │
+    │                ff            x•••                                        │
+    │                  ffff            •••••                                   │
     │                     fff              ••••                                │
  750┤                        fff               •                               │
     │                          ffffff           •                              │
@@ -65,7 +65,9 @@ Here the `TPOT_limit=10ms`. All datapoints shown on the pareto frontier meet `TT
 Each point on the pareto frontier can represent a different config {parallel, concurrency}.  
 The pareto frontier means, no matter how you change your deployment parallel strategy and 
 benchmark with different concurrency, the datapoint will be under the frontier.  
-What we need is the highest point on the frontier which is left to `1000ms/TPOT_limit = 100 tokens/s/user`. 
+A `TPOT_limit` of 10 ms requires at least `1000ms/TPOT_limit = 100 tokens/s/user`.
+What we need is the highest point on the frontier at or to the right of that threshold.
+Points to its left exceed the TPOT limit.
 The point tagged as `x` is the one we find. This point indicates the `parellel strategy` as well as the `concurrency` level  
 We can find that, the config in this parallel strategy **is potentially only best for this given 
 concurrency instead of being generally better**.  

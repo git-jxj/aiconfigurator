@@ -583,7 +583,7 @@ print(result.best_configs["disagg"])
      0                60                 120               180              240 
 tokens/s/gpu                        tokens/s/user                               
 ```
-Pareto frontier shows the trade-off betwen generation speed `tokens/s/user` and throughput `tokens/s/gpu`. The best points is tagged as `x`. As you want the TPOT to be at most 10ms, which means the generation speed is at least 1000/10ms = 100 tokens/s/user, then by reading the pareto froniter, you will get the point tagged as x. You can see that, if you want different TPOT, you will have different result. Sometimes, agg will be better than disagg (higher throughput at same tokens/s/user)
+Pareto frontier shows the trade-off between generation speed `tokens/s/user` and throughput `tokens/s/gpu`. The best point is tagged as `x`. As you want the TPOT to be at most 10ms, which means the generation speed is at least 1000/10ms = 100 tokens/s/user, then by reading the Pareto frontier, you will get the point tagged as x. You can see that, if you want different TPOT, you will have different result. Sometimes, agg will be better than disagg (higher throughput at same tokens/s/user)
 
 3. Worker setup
 ```

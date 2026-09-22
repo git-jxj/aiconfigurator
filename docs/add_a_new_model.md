@@ -1,5 +1,11 @@
 # How to Add a New Model
 
+> AIConfigurator is in a maintenance-only transition to
+> [AISimulate](https://github.com/ai-dynamo/aisimulate). Propose new model coverage
+> and new operations there. This guide describes the existing AIC model layer
+> for compatibility maintenance; see [CONTRIBUTING.md](../CONTRIBUTING.md) for
+> the changes still accepted in this repository.
+
 ## Understanding How AIConfigurator Does End-to-End Latency Estimation
 
 How to add a new model depends on how 'new' the model is. First, let's review how aiconfigurator does latency estimation.
@@ -8,7 +14,7 @@ In aiconfigurator, the end-to-end latency estimation depends on operation-level 
 
 ### 1. Break Down the Model into Operations
 
-The model is broken down into operations, as shown in the source file [`models.py`](../src/aiconfigurator/sdk/models.py). A model is composed of operations such as GEMM and MoE defined in the [`operations` package](../aic-core/src/aiconfigurator_core/sdk/operations/) (see its README for the single-oracle contract).
+The model is broken down into operations, as shown in the canonical [`models` package](../aic-core/src/aiconfigurator_core/sdk/models/). The upper `src/aiconfigurator/sdk/models/` package is a compatibility facade; model implementations live in `aic-core`. A model is composed of operations such as GEMM and MoE defined in the [`operations` package](../aic-core/src/aiconfigurator_core/sdk/operations/) (see its README for the single-oracle contract).
 
 ### 2. Get Operation Latency Estimation
 
@@ -57,7 +63,7 @@ Now let's revisit how to add a new model in aiconfigurator. There are 3 situatio
 
 If the model is a simple variant of an existing architecture (for example, it's similar to Qwen3 32B and only has slight differences, such as different positional embedding, different q/k/v heads of GQA, different number of layers, different hidden size), these are treated as **simple variants**.
 
-In this case, you just need to ensure the architecture is supported in **ARCHITECTURE_TO_MODEL_FAMILY** in [`common.py`](../src/aiconfigurator/sdk/common.py):
+In this case, you just need to ensure the architecture is supported in **ARCHITECTURE_TO_MODEL_FAMILY** in [`common.py`](../aic-core/src/aiconfigurator_core/sdk/common.py):
 
 ```python
 "YourModelForCausalLM": "LLAMA",  # or "MOE", "DEEPSEEK", etc.
@@ -67,7 +73,7 @@ AIConfigurator will automatically download the model's `config.json` from Huggin
 
 **Note**: If the architecture already exists in `ARCHITECTURE_TO_MODEL_FAMILY` (e.g., `LlamaForCausalLM`, `Qwen3ForCausalLM`, `MixtralForCausalLM`), no changes are needed - just use the model directly.
 
-Here 'LLAMA', 'MOE', 'DEEPSEEK' are the model families defined in **ModelFamily** in [`common.py`](../src/aiconfigurator/sdk/common.py)
+Here 'LLAMA', 'MOE', 'DEEPSEEK' are the model families defined in **ModelFamily** in [`common.py`](../aic-core/src/aiconfigurator_core/sdk/common.py)
 
 
 ### Situation 2: Model Requires Additional Performance Data
@@ -88,19 +94,19 @@ Models with different MLA operations also follow a similar process. For example,
 
 ### Situation 3: Model Needs New Operation Support
 
-Today, we don't support the Mamba model yet. By looking at the Mamba model, it relies on the support of convolution operations. Convolution is not yet supported, so you need to add a new operation `Conv`.
+This case applies when an operation is not yet modeled. Mamba is already represented by the [NemotronH hybrid model](../aic-core/src/aiconfigurator_core/sdk/models/nemotron_h.py) and [Mamba operation classes](../aic-core/src/aiconfigurator_core/sdk/operations/mamba.py); it is not an example of a missing operation. The steps below use `NewOp` as a placeholder for an operation that is actually absent.
 
 Steps required (per-op performance math lives ONLY in the compiled Rust
 engine — see `.claude/rules/rust-core/parity.md` Rule 2 and
 `aic-core/src/aiconfigurator_core/sdk/operations/README.md` for the full
 single-oracle flow):
 
-1. **Model `Conv` in the Rust engine**: an operator in
+1. **Model `NewOp` in the Rust engine**: an operator in
    `aic-core/rust/aiconfigurator-core/src/operators/` (query + SOL roofline +
    energy) and a parquet loader in
    `aic-core/rust/aiconfigurator-core/src/perf_database/`, anchored by a Rust
    `#[cfg(test)]` oracle test.
-2. **Define the Python `Conv` op class** in
+2. **Define the Python `NewOp` op class** in
    `aic-core/src/aiconfigurator_core/sdk/operations/` — constructor, fields,
    `get_weights`, and the parquet loader / `load_data` (the raw data plane for
    charts and the support matrix). No Python `query()` body or interpolation:
@@ -112,7 +118,7 @@ single-oracle flow):
    plus the `aic-core/rust/aiconfigurator-core/src/engine/spec.rs` round-trip fixture.
    `tests/unit/sdk/test_opspec_coverage.py` enforces this.
 4. **Define the data collection process** in collector by referring to existing operations' collection code, such as `collect_gemm.py`
-5. **Collect data for conv**, register its family in
+5. **Collect data for the new operation**, register its family in
    `collector/op_backend_catalog.yaml`, and add the finalized parquet file
    under
    `aic-core/src/aiconfigurator_core/systems/data/<system>/<family>/<backend>/<version>/`
@@ -121,8 +127,7 @@ single-oracle flow):
    case via `aic-core/rust/aiconfigurator-core/parity_tests/pin_goldens.py`
    (append-only); later modeling
    changes carry their golden diff.
-7. **Add new model definition** in `models.py` to build your model with new operation. A new model class is mapping to a new model family.  
-update your model in ModelFamily dict defined in [`common.py`](../src/aiconfigurator/sdk/common.py)
+7. **Define and register the model** in the canonical `aic-core/src/aiconfigurator_core/sdk/models/` package using `@register_model`. Update `ModelFamily` and `ARCHITECTURE_TO_MODEL_FAMILY` in [`common.py`](../aic-core/src/aiconfigurator_core/sdk/common.py). See the [model registry guide](../aic-core/src/aiconfigurator_core/sdk/models/README.md) for the existing registration contract.
 
 ### AFD Operation Partitioning Compatibility
 
@@ -155,9 +160,9 @@ flowchart TD
     B --> C[Ensure architecture exists in <i><b>ARCHITECTURE_TO_MODEL_FAMILY</b></i>, then use directly with <i><b>--model-path</b></i>]
     A --> |NO| D([Each layer in <i><b>Nemotron</b></i> can have a different <i><b>inter_size</b></i>, so we defined a new class for this model])
     D --> E[Does the model need new operations?]
-    E --> |YES| F([for instance, new model might have covolution, which isn't defined in sdk/operations.py])
-    F --> G[Define your operations in <b><i>sdk/operations.py</b></i>]
-    G --> H[Define the model as a new model class in <i><b>sdk/models.py</b></i> using the op classes from <i><b>sdk/operations/</b></i>]
+    E --> |YES| F([An operation is not yet modeled])
+    F --> G[Define the Rust operator and its Python shell in <b><i>aic-core</i></b>]
+    G --> H[Define and register the model in <i><b>aic-core/src/aiconfigurator_core/sdk/models/</b></i>]
     E --> |NO|H
     H --> i[Add architecture mapping to <i><b>ARCHITECTURE_TO_MODEL_FAMILY</b></i>]
     i --> j[Do you need to collect performance data for the new model?]

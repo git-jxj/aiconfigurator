@@ -1,4 +1,4 @@
-# How to Add a New Model
+# Model Layer Compatibility Maintenance
 
 > AIConfigurator is in a maintenance-only transition to
 > [AISimulate](https://github.com/ai-dynamo/aisimulate). Propose new model coverage
@@ -8,7 +8,7 @@
 
 ## Understanding How AIConfigurator Does End-to-End Latency Estimation
 
-How to add a new model depends on how 'new' the model is. First, let's review how aiconfigurator does latency estimation.
+To maintain existing model behavior, first review how AIConfigurator estimates latency.
 
 In aiconfigurator, the end-to-end latency estimation depends on operation-level latency estimation. There are 3 steps to achieve this:
 
@@ -55,9 +55,15 @@ Finalize the collector's `moe_perf.txt` staging output as
 rebuild and reinstall aiconfigurator.
 
 
-## Adding a New Model
+## Maintaining Model Compatibility
 
-Now let's revisit how to add a new model in aiconfigurator. There are 3 situations:
+The following procedures document the existing implementation for bug and
+migration-blocking compatibility fixes. They are not a path for adding new
+model coverage to AIC. Propose new coverage and operations in AISimulate;
+confirm significant AIC compatibility fixes with the Dynamo team in an issue
+before changing this repository, as required by CONTRIBUTING.md.
+
+There are three implementation situations:
 
 ### Situation 1: Simple Variant Without New Operations
 
@@ -96,10 +102,12 @@ Models with different MLA operations also follow a similar process. For example,
 
 This case applies when an operation is not yet modeled. Mamba is already represented by the [NemotronH hybrid model](../aic-core/src/aiconfigurator_core/sdk/models/nemotron_h.py) and [Mamba operation classes](../aic-core/src/aiconfigurator_core/sdk/operations/mamba.py); it is not an example of a missing operation. The steps below use `NewOp` as a placeholder for an operation that is actually absent.
 
-Steps required (per-op performance math lives ONLY in the compiled Rust
-engine — see `.claude/rules/rust-core/parity.md` Rule 2 and
+The following implementation checklist is retained for an AIC compatibility
+fix whose scope has been confirmed by the Dynamo team. A missing operation
+for new model coverage belongs in AISimulate, not this workflow. Per-op
+performance math lives ONLY in the compiled Rust engine — see `.claude/rules/rust-core/parity.md` Rule 2 and
 `aic-core/src/aiconfigurator_core/sdk/operations/README.md` for the full
-single-oracle flow):
+single-oracle flow:
 
 1. **Model `NewOp` in the Rust engine**: an operator in
    `aic-core/rust/aiconfigurator-core/src/operators/` (query + SOL roofline +
@@ -131,7 +139,7 @@ single-oracle flow):
 
 ### AFD Operation Partitioning Compatibility
 
-Attention-FFN Disaggregated (AFD) estimate mode has one additional maintenance contract beyond the normal aggregated and P/D-disaggregated paths. [`sdk/afd_partition.py`](../src/aiconfigurator/sdk/afd_partition.py) splits a model's `context_ops` / `generation_ops` into A-worker and F-worker pools by operation name. When adding a new model family or new operation, make sure the generated operation names can be classified by the AFD partitioner.
+Attention-FFN Disaggregated (AFD) estimate mode has one additional maintenance contract beyond the normal aggregated and P/D-disaggregated paths. [`sdk/afd_partition.py`](../src/aiconfigurator/sdk/afd_partition.py) splits a model's `context_ops` / `generation_ops` into A-worker and F-worker pools by operation name. When an accepted compatibility fix changes model operations, make sure the generated operation names can be classified by the AFD partitioner.
 
 The current AFD partitioning contract is:
 
@@ -146,13 +154,18 @@ If a new operation cannot be classified, do not rely on an unknown-op fallback f
 
 ## Final Steps
 
-Rebuild & reinstall aiconfigurator to add this model's support.
+For an accepted compatibility fix, rebuild and reinstall AIConfigurator to
+validate the corrected behavior.
 
 ---
 
-> **Need Help?** If you still have difficulty adding the model you want, please create an issue in github.
+> **Need Help?** Propose new model coverage in [AISimulate](https://github.com/ai-dynamo/aisimulate/issues). For an existing AIC compatibility problem, open an [AIC issue](https://github.com/ai-dynamo/aiconfigurator/issues) to confirm the scope.
 
-## A Workflow For Reference
+## Compatibility Maintenance Workflow
+
+This diagram summarizes the implementation paths above only for an accepted
+AIC compatibility fix. New model coverage and operations follow AISimulate's
+contribution process instead.
 ```mermaid
 flowchart TD
     A[Does the model belong to an existing model_family?]
